@@ -1,0 +1,33 @@
+import pandas as pd
+from pyculiarity import detect_vec
+from influxdb import InfluxDBClient
+client=InfluxDBClient('localhost',8086,'pramit','pramit','statistics')
+result=client.query('select * from eventflow_IIS ')
+pts = list(result.get_points(measurement='eventflow_IIS'))
+ec=[]
+count=0
+for i in range(0,len(pts)):
+    ec.append([float(pts[i]["eventcount"]),pts[i]["time"],count])
+    count+=1
+df=pd.DataFrame(ec,columns=['eventcount','time','count'])
+#print df
+res=detect_vec(df.iloc[:,0],max_anoms=0.2,direction="pos",only_last=False,period=200,plot=False)
+rest=res['anoms']['timestamp'].tolist()
+final_list=[]
+for item in ec:
+    #print(item)
+    a1=dict()
+    a1['measurement']="anomaly_py_try"
+    t1=dict()
+    if item[2] in rest:
+        t1['anomaly']=1
+    else:
+        t1['anomaly']=0
+    a1['tags']=t1
+    a1['time']=item[1]
+    t1=dict()
+    t1["eventcount"]=item[0]
+    a1['fields']=t1
+    final_list.append(a1)
+#print final_list
+client.write_points(final_list,time_precision='ms')
